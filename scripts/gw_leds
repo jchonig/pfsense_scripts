@@ -1,0 +1,71 @@
+#!/bin/sh
+
+#
+# This script updates the SG-3100 device's first LED with gateway status
+#
+# Based on tcsh script by msf2000 on this thread https://forum.netgate.com/topic/122407/netgate-sg-3100-leds
+#
+
+# based on gwstatus, set color of first LED
+# led a  -  led b  -  led c
+# 6 7 8  -  3 4 5  -  0 1 2 
+
+set_leds () {
+    case ${1} in
+	"a")
+	    red=6
+	    green=7
+	    blue=8
+	    ;;
+	"b")
+	    red=3
+	    green=4
+	    blue=5
+	    ;;
+	"c")
+	    red=0
+	    green=1
+	    blue=2
+	    ;;
+    esac
+
+    case ${2} in
+	"none"|"Online")
+	    /usr/sbin/gpioctl ${red} duty 0
+	    /usr/sbin/gpioctl ${green} duty 16
+	    /usr/sbin/gpioctl ${blue} duty 0
+	    ;;
+	"down"|"Offline")
+	    /usr/sbin/gpioctl ${red} duty 16
+	    /usr/sbin/gpioctl ${green} duty 0
+	    /usr/sbin/gpioctl ${blue} duty 0
+	    ;;
+	"highloss"|"loss"|"highdelay"|"delay"|"Warning")
+	    /usr/sbin/gpioctl ${red} duty 16
+	    /usr/sbin/gpioctl ${green} duty 4
+	    /usr/sbin/gpioctl ${blue} duty 0
+	    ;;
+	*)
+	    /usr/sbin/gpioctl ${red} duty 0
+	    /usr/sbin/gpioctl ${green} duty 0
+	    /usr/sbin/gpioctl ${blue} duty 16
+	    ;;
+    esac
+}
+
+# /usr/local/bin/php /usr/local/sbin/pfSsh.php playback gatewaystatus
+# Name           Monitor       Source              Delay   StdDev  Loss  Status
+# WAN_EA_DHCP    38.145.154.1  38.145.155.206     2.04ms  0.398ms  0.0%    none
+# WAN_OTTC_DHCP  64.246.237.1  64.246.237.123    0.607ms  0.023ms  0.0%    none
+
+/usr/local/bin/php /usr/local/sbin/pfSsh.php playback gatewaystatus | \
+    while read name monitor source delay stddev loss status; do
+	case ${name} in
+	    "WAN_OTTC_DHCP")
+		set_leds "a" "${status}"
+		;;
+	    "WAN_EA_DHCP")
+		set_leds "b" "${status}"
+		;;
+	esac
+    done

@@ -4,7 +4,12 @@
 # This script updates the SG-3100 device's first LED with gateway status
 #
 # Based on tcsh script by msf2000 on this thread https://forum.netgate.com/topic/122407/netgate-sg-3100-leds
+# Finding gpio device based on https://github.com/justdaniel-gh/sg3100customleds/commit/ddbf412cb1cf3ba32160972e2177c356611ff57f
 #
+
+# gpio device number
+# A way to get the gpio device that controls the led lights (its not always 0)
+gdev="/dev/gpioc$(sysctl dev.gpio | grep .led. | cut -d . -f 3 | uniq)"
 
 # based on gwstatus, set color of first LED
 # led a  -  led b  -  led c
@@ -31,24 +36,24 @@ set_leds () {
 
     case ${2} in
 	"none"|"Online")
-	    /usr/sbin/gpioctl ${red} duty 0
-	    /usr/sbin/gpioctl ${green} duty 16
-	    /usr/sbin/gpioctl ${blue} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 16
+	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
 	    ;;
 	"down"|"Offline")
-	    /usr/sbin/gpioctl ${red} duty 16
-	    /usr/sbin/gpioctl ${green} duty 0
-	    /usr/sbin/gpioctl ${blue} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
+	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
 	    ;;
 	"highloss"|"loss"|"highdelay"|"delay"|"Warning")
-	    /usr/sbin/gpioctl ${red} duty 16
-	    /usr/sbin/gpioctl ${green} duty 4
-	    /usr/sbin/gpioctl ${blue} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
+	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 4
+	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
 	    ;;
 	*)
-	    /usr/sbin/gpioctl ${red} duty 0
-	    /usr/sbin/gpioctl ${green} duty 0
-	    /usr/sbin/gpioctl ${blue} duty 16
+	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
+	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 16
 	    ;;
     esac
 }

@@ -71,19 +71,67 @@ set_leds () {
     esac
 }
 
+verbose () {
+    test -z "$do_verbose" && return
+
+    echo "V: ${*}" >&2
+}
+
+gw_a=
+gw_b=
+gw_c=
+do_verbose=
+
+OPTIONS=$(getopt "a:b:c:v" $*) || exit 1
+set -- ${OPTIONS}
+while true; do
+    case ${1} in
+	"-a")
+	    gw_a="${2}"
+	    shift 2
+	    ;;
+	"-b")
+	    gw_b="${2}"
+	    shift 2
+	    ;;
+	"-c")
+	    gw_c="${2}"
+	    shift 2
+	    ;;
+	"-v")
+	    do_verbose='-v'
+	    shift
+	    ;;
+	--)
+	   shift
+	   break
+	   ;;
+	*)
+	  echo "Internal error!" >&2
+	  exit 1
+	  ;;
+    esac
+done
+
+# 21.05x
 # /usr/local/bin/php /usr/local/sbin/pfSsh.php playback gatewaystatus
-# Name           Monitor       Source              Delay   StdDev  Loss  Status
-# WAN_EA_DHCP    38.145.154.1  38.145.155.206     2.04ms  0.398ms  0.0%    none
-# WAN_OTTC_DHCP  64.246.237.1  64.246.237.123    0.607ms  0.023ms  0.0%    none
+# Name           Monitor        Source              Delay   StdDev  Loss  Status  Substatus
+# WAN_EA_DHCP    38.145.154.1   38.145.155.206    2.188ms  0.236ms  0.0%  online       none
+# WAN_OTTC_DHCP  192.190.166.1  192.190.166.60     0.74ms  0.177ms  0.0%  online       none
 
 /usr/local/bin/php /usr/local/sbin/pfSsh.php playback gatewaystatus | \
     while read name monitor source delay stddev loss status substatus; do
-	case ${name} in
-	    "WAN_OTTC_DHCP")
-		set_leds "a" "${status}" "${substatus}"
-		;;
-	    "WAN_EA_DHCP")
-		set_leds "b" "${status}" "${substatus}"
-		;;
-	esac
+	test "${name}" == "Name" && continue
+	verbose "Name: ${name} ${source}->${monitor} Delay: ${delay} Stdev: ${stdev} Loss: ${loss} Status: ${status} Substatus: ${substatus}"
+	if [ "${name}" == "${gw_a}" ]; then
+	    set_leds "a" "${status}" "${substatus}"
+	elif [ "${name}" == "${gw_b}" ]; then
+	    set_leds "b" "${status}" "${substatus}"
+	elif [ "${name}" == "${gw_c}" ]; then
+	    set_leds "c" "${status}" "${substatus}"
+	else
+	    echo "Gateway ${name} not matched" 2>&1
+	fi
     done
+
+exit 0

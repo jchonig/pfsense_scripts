@@ -9,64 +9,82 @@
 
 # gpio device number
 # A way to get the gpio device that controls the led lights (its not always 0)
-gdev="/dev/gpioc$(sysctl dev.gpio | grep .led. | cut -d . -f 3 | uniq)"
+gdev="$(sysctl dev.gpio | grep .led. | cut -d . -f 3 | uniq)"
 
 # based on gwstatus, set color of first LED
 # led a  -  led b  -  led c
 # 6 7 8  -  3 4 5  -  0 1 2 
 
+set_led () {
+    /usr/sbin/gpioctl -f /dev/gpioc${gdev} ${1} duty ${2}
+}
+
 set_leds () {
+
+    if [ $# -ne 4 ]; then
+	echo "Invalid call to set_leds: $*" 2>&1
+	return
+    fi
+
     case ${1} in
 	"a")
+	    led=0
 	    red=6
 	    green=7
 	    blue=8
 	    ;;
 	"b")
+	    led=1
 	    red=3
 	    green=4
 	    blue=5
 	    ;;
 	"c")
+	    led=2
 	    red=0
 	    green=1
 	    blue=2
 	    ;;
     esac
 
+    # Enable PWM mode
+    sysctl dev.gpio.${gdev}.led.${led}.pwm=1
+
+    set_led ${red} ${2}
+    set_led ${green} ${3}
+    set_led ${blue} ${4}
+}
+
+set_status () {
     case ${2} in
 	"down"|"none")
 	    # Down
-	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
-	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
-	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+	    set_leds ${1} 16 0 0
 	    ;;
 	"online")
 	    # Online, look at substates
 	    case ${3} in
 		"none")
-		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
-		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 16
-		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+		    set_leds ${1} 0 16 0
 		    ;;
 		"force_down")
-		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
-		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
-		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 16
+		    set_leds ${1} 16 0 0
+		    ;;
+		"delay"|"loss")
+		    set_leds ${1} 16 4 0
+		    ;;
+		"high_delay"|"high_loss")
+		    set_leds ${1} 16 2 0
 		    ;;
 		*)
-		    # Includes high_delay, high_loss, delay, loss
-		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
-		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 4
-		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+		    # Unknown
+		    set_letds ${1} 0 0 8
 		    ;;
 	    esac
 	    ;;
 	*)
 	    # Unknown
-	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
-	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
-	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 16
+	    set_leds ${1} 0 0 16
 	    ;;
     esac
 }
@@ -82,7 +100,7 @@ gw_b=
 gw_c=
 do_verbose=
 
-OPTIONS=$(getopt "a:b:c:v" $*) || exit 1
+OPTIONS=$(getopt "a:b:c:vA:B:C:" $*) || exit 1
 set -- ${OPTIONS}
 while true; do
     case ${1} in
@@ -96,6 +114,18 @@ while true; do
 	    ;;
 	"-c")
 	    gw_c="${2}"
+	    shift 2
+	    ;;
+	"-A")
+	    eval set_leds a $(echo ${2} | sed 's/,/ /g')
+	    shift 2
+	    ;;
+	"-B")
+	    eval set_leds b $(echo ${2} | sed 's/,/ /g')
+	    shift 2
+	    ;;
+	"-C")
+	    eval set_leds c $(echo ${2} | sed 's/,/ /g')
 	    shift 2
 	    ;;
 	"-v")
@@ -124,11 +154,11 @@ done
 	test "${name}" == "Name" && continue
 	verbose "Name: ${name} ${source}->${monitor} Delay: ${delay} Stdev: ${stdev} Loss: ${loss} Status: ${status} Substatus: ${substatus}"
 	if [ "${name}" == "${gw_a}" ]; then
-	    set_leds "a" "${status}" "${substatus}"
+	    set_status "a" "${status}" "${substatus}"
 	elif [ "${name}" == "${gw_b}" ]; then
-	    set_leds "b" "${status}" "${substatus}"
+	    set_status "b" "${status}" "${substatus}"
 	elif [ "${name}" == "${gw_c}" ]; then
-	    set_leds "c" "${status}" "${substatus}"
+	    set_status "c" "${status}" "${substatus}"
 	else
 	    echo "Gateway ${name} not matched" 2>&1
 	fi

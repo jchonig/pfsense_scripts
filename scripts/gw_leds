@@ -35,22 +35,35 @@ set_leds () {
     esac
 
     case ${2} in
-	"none"|"Online")
-	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
-	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 16
-	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
-	    ;;
-	"down"|"Offline")
+	"down"|"none")
+	    # Down
 	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
 	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
 	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
 	    ;;
-	"highloss"|"loss"|"highdelay"|"delay"|"Warning")
-	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
-	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 4
-	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+	"online")
+	    # Online, look at substates
+	    case ${3} in
+		"none")
+		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
+		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 16
+		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+		    ;;
+		"force_down")
+		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
+		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
+		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 16
+		    ;;
+		*)
+		    # Includes high_delay, high_loss, delay, loss
+		    /usr/sbin/gpioctl -f ${gdev} ${red} duty 16
+		    /usr/sbin/gpioctl -f ${gdev} ${green} duty 4
+		    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 0
+		    ;;
+	    esac
 	    ;;
 	*)
+	    # Unknown
 	    /usr/sbin/gpioctl -f ${gdev} ${red} duty 0
 	    /usr/sbin/gpioctl -f ${gdev} ${green} duty 0
 	    /usr/sbin/gpioctl -f ${gdev} ${blue} duty 16
@@ -64,13 +77,13 @@ set_leds () {
 # WAN_OTTC_DHCP  64.246.237.1  64.246.237.123    0.607ms  0.023ms  0.0%    none
 
 /usr/local/bin/php /usr/local/sbin/pfSsh.php playback gatewaystatus | \
-    while read name monitor source delay stddev loss status; do
+    while read name monitor source delay stddev loss status substatus; do
 	case ${name} in
 	    "WAN_OTTC_DHCP")
-		set_leds "a" "${status}"
+		set_leds "a" "${status}" "${substatus}"
 		;;
 	    "WAN_EA_DHCP")
-		set_leds "b" "${status}"
+		set_leds "b" "${status}" "${substatus}"
 		;;
 	esac
     done

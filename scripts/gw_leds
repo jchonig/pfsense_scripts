@@ -6,10 +6,28 @@
 # Based on tcsh script by msf2000 on this thread https://forum.netgate.com/topic/122407/netgate-sg-3100-leds
 # Finding gpio device based on https://github.com/justdaniel-gh/sg3100customleds/commit/ddbf412cb1cf3ba32160972e2177c356611ff57f
 #
+progname=$(basename ${0})
+
+fail () {
+    local rc=${1}
+
+    shift
+
+    logger -s -t "${progname}" -p daemon.err ${*}
+
+    exit ${rc}
+}
+
+err () {
+    logger -s -t "${progname}" -p daemon.err ${*}
+}
 
 # gpio device number
 # A way to get the gpio device that controls the led lights (its not always 0)
 gdev="$(sysctl dev.gpio | grep .led. | cut -d . -f 3 | uniq)"
+if [ -z "${gdev}" ]; then
+    fail 1 "Unable to find LED device"
+fi
 
 # based on gwstatus, set color of first LED
 # led a  -  led b  -  led c
@@ -22,7 +40,7 @@ set_led () {
 set_leds () {
 
     if [ $# -ne 4 ]; then
-	echo "Invalid call to set_leds: $*" 2>&1
+	err "Invalid call to set_leds: $*"
 	return
     fi
 
@@ -133,13 +151,12 @@ while true; do
 	    shift
 	    ;;
 	--)
-	   shift
-	   break
-	   ;;
+	    shift
+	    break
+	    ;;
 	*)
-	  echo "Internal error!" >&2
-	  exit 1
-	  ;;
+	    fail "Internal error!"
+	    ;;
     esac
 done
 
@@ -160,7 +177,7 @@ done
 	elif [ "${name}" == "${gw_c}" ]; then
 	    set_status "c" "${status}" "${substatus}"
 	else
-	    echo "Gateway ${name} not matched" 2>&1
+	    err "Gateway ${name} not matched"
 	fi
     done
 
